@@ -14,17 +14,17 @@ export function registerChatHandlers(io: IO, socket: IOSocket) {
         data: {
           sessionId,
           authorId: socket.data.userId,
+          characterId: socket.data.characterId,
           kind: "CHAT",
           content: text.slice(0, 4000),
         },
-        include: { character: { select: { name: true } } },
       });
 
       io.to(sessionId).emit("chat:message", {
         id: message.id,
         sessionId,
         authorName: socket.data.userName,
-        characterName: message.character?.name ?? null,
+        characterName: socket.data.characterName,
         kind: "CHAT",
         content: message.content,
         createdAt: message.createdAt.toISOString(),

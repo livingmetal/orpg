@@ -3,6 +3,7 @@ import { prisma } from "../../src/lib/db";
 import type { IO } from "./types";
 import { registerChatHandlers } from "./handlers/chat";
 import { registerDiceHandlers } from "./handlers/dice";
+import { registerLlmHandlers } from "./handlers/llm";
 
 const HISTORY_LIMIT = 50;
 
@@ -33,6 +34,8 @@ export function registerSocketHandlers(io: IO) {
       if (!token?.sub) return next(new Error("unauthorized"));
       socket.data.userId = token.sub;
       socket.data.userName = (token.name as string | null) ?? null;
+      socket.data.characterId = null;
+      socket.data.characterName = null;
       next();
     } catch {
       next(new Error("unauthorized"));
@@ -58,7 +61,16 @@ export function registerSocketHandlers(io: IO) {
           });
         }
 
+        // Restore the character this user last played at this table, if any.
+        const member = await prisma.sessionMember.findUnique({
+          where: { sessionId_userId: { sessionId, userId: socket.data.userId } },
+          select: { character: { select: { id: true, name: true } } },
+        });
+        socket.data.characterId = member?.character?.id ?? null;
+        socket.data.characterName = member?.character?.name ?? null;
+
         socket.join(sessionId);
+        socket.emit("character:set", socket.data.characterName);
 
         // Send recent history to the joining client only.
         const history = await prisma.chatMessage.findMany({
@@ -90,7 +102,39 @@ export function registerSocketHandlers(io: IO) {
       socket.leave(sessionId);
     });
 
+    // Choose (or clear) the character the user plays in this session.
+    socket.on("session:setCharacter", async ({ sessionId, characterId }) => {
+      try {
+        if (characterId) {
+          const character = await prisma.character.findUnique({
+            where: { id: characterId },
+            select: { id: true, name: true, ownerId: true },
+          });
+          if (!character || character.ownerId !== socket.data.userId) {
+            return socket.emit("error", "You don't own that character");
+          }
+          await prisma.sessionMember.update({
+            where: { sessionId_userId: { sessionId, userId: socket.data.userId } },
+            data: { characterId },
+          });
+          socket.data.characterId = character.id;
+          socket.data.characterName = character.name;
+        } else {
+          await prisma.sessionMember.update({
+            where: { sessionId_userId: { sessionId, userId: socket.data.userId } },
+            data: { characterId: null },
+          });
+          socket.data.characterId = null;
+          socket.data.characterName = null;
+        }
+        socket.emit("character:set", socket.data.characterName);
+      } catch {
+        socket.emit("error", "Failed to set character");
+      }
+    });
+
     registerChatHandlers(io, socket);
     registerDiceHandlers(io, socket);
+    registerLlmHandlers(io, socket);
   });
 }

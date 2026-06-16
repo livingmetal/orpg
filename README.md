@@ -16,13 +16,14 @@ address. No separate database server to install or run.
 > Status: **scaffolding**. Structure, config, and skeletons are in place; most
 > logic is stubbed with `TODO`. See [docs/roadmap.md](docs/roadmap.md).
 
-## Features (planned)
+## Features
 
-- 🗨️ **Realtime chat** per game session (Socket.IO rooms)
-- 🎲 **Dice** with standard notation (`2d6+3`, `1d20`, `1d100-5`)
-- 📜 **Character sheets** authored in advance (rule-system flexible)
+- 🗨️ **Realtime chat** per game session (Socket.IO rooms), attributed to your character
+- 🎲 **Dice** with standard notation (`2d6+3`, `1d20`, `1d100-5`), logged to the table
+- 📜 **Character sheets** authored in advance (generic, rule-system flexible)
 - 📖 **GM storyboards** — drafted privately, published to the session
-- 🤖 **LLM assist** for rules lookups, log summaries, and NPC lines
+- 🤖 **LLM assist** in chat via `/ai <question>` — rules, dice math, summaries, NPC lines
+- 🔐 **Accounts** with NextAuth (email + password)
 
 ## Tech stack
 

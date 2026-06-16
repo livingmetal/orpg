@@ -23,19 +23,34 @@ export function ChatPanel({ sessionId }: { sessionId: string }) {
   function send() {
     const content = draft.trim();
     if (!content) return;
-    getSocket().emit("chat:send", { sessionId, content });
+    // "/ai <question>" routes to the LLM assistant instead of plain chat.
+    const ai = content.match(/^\/(ai|gm)\s+(.+)/is);
+    if (ai) {
+      getSocket().emit("llm:ask", { sessionId, prompt: ai[2] });
+    } else {
+      getSocket().emit("chat:send", { sessionId, content });
+    }
     setDraft("");
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded border border-neutral-800">
       <ul className="flex-1 space-y-1 overflow-y-auto p-3 text-sm">
-        {messages.map((m) => (
-          <li key={m.id}>
-            <span className="text-neutral-500">{m.characterName ?? m.authorName ?? "—"}:</span>{" "}
-            {m.content}
-          </li>
-        ))}
+        {messages.map((m) => {
+          const who = m.kind === "LLM_ASSIST" ? "AI" : m.characterName ?? m.authorName ?? "—";
+          const whoColor =
+            m.kind === "LLM_ASSIST"
+              ? "text-purple-400"
+              : m.kind === "DICE"
+                ? "text-emerald-400"
+                : "text-neutral-500";
+          return (
+            <li key={m.id} className={m.kind === "LLM_ASSIST" ? "text-purple-200" : undefined}>
+              <span className={whoColor}>{who}:</span>{" "}
+              <span className="whitespace-pre-wrap">{m.content}</span>
+            </li>
+          );
+        })}
       </ul>
       <div className="flex gap-2 border-t border-neutral-800 p-2">
         <input
@@ -43,7 +58,7 @@ export function ChatPanel({ sessionId }: { sessionId: string }) {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="Message…"
+          placeholder="Message…  (try /ai <question>)"
         />
         <button className="rounded bg-sky-600 px-3 text-sm" onClick={send}>
           Send

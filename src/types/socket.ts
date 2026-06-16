@@ -25,14 +25,17 @@ export interface DiceRollPayload {
 export interface ClientToServerEvents {
   "session:join": (sessionId: string) => void;
   "session:leave": (sessionId: string) => void;
+  "session:setCharacter": (input: { sessionId: string; characterId: string | null }) => void;
   "chat:send": (input: { sessionId: string; content: string }) => void;
   "dice:roll": (input: { sessionId: string; notation: string }) => void;
+  "llm:ask": (input: { sessionId: string; prompt: string }) => void;
 }
 
 // Events the server pushes to clients.
 export interface ServerToClientEvents {
   "chat:message": (payload: ChatMessagePayload) => void;
   "dice:result": (payload: DiceRollPayload) => void;
+  "character:set": (characterName: string | null) => void;
   "error": (message: string) => void;
 }
 
@@ -40,4 +43,6 @@ export interface ServerToClientEvents {
 export interface SocketData {
   userId: string;
   userName: string | null;
+  characterId: string | null;
+  characterName: string | null;
 }

@@ -27,6 +27,7 @@ export function registerDiceHandlers(io: IO, socket: IOSocket) {
           data: {
             sessionId,
             userId: socket.data.userId,
+            characterId: socket.data.characterId,
             notation: result.notation,
             results: result.rolls,
             total: result.total,
@@ -36,16 +37,19 @@ export function registerDiceHandlers(io: IO, socket: IOSocket) {
           data: {
             sessionId,
             authorId: socket.data.userId,
+            characterId: socket.data.characterId,
             kind: "DICE",
             content: logLine,
           },
         }),
       ]);
 
+      const byName = socket.data.characterName ?? socket.data.userName;
+
       io.to(sessionId).emit("dice:result", {
         id: diceRow.id,
         sessionId,
-        byName: socket.data.userName,
+        byName,
         result,
         createdAt: diceRow.createdAt.toISOString(),
       });
@@ -54,7 +58,7 @@ export function registerDiceHandlers(io: IO, socket: IOSocket) {
         id: message.id,
         sessionId,
         authorName: socket.data.userName,
-        characterName: null,
+        characterName: socket.data.characterName,
         kind: "DICE",
         content: message.content,
         createdAt: message.createdAt.toISOString(),

@@ -1,25 +1,30 @@
 import { NextResponse } from "next/server";
-import { anthropic, DEFAULT_MODEL } from "@/lib/anthropic";
+import { assist, llmConfigured } from "@/lib/llm-assist";
+import { getCurrentUser } from "@/lib/session";
+import { rateLimit } from "@/lib/rate-limit";
 
-// POST /api/llm/assist
-// Small table-side help: rules questions, summarizing the log, explaining a
-// dice result, suggesting NPC lines. Keep prompts scoped and cheap.
+// POST /api/llm/assist  { prompt, sessionId? }
+// Small table-side help: rules questions, summaries, dice math, NPC lines.
 export async function POST(req: Request) {
-  // TODO: auth check + rate limiting + session-scoped context.
-  const { prompt } = (await req.json().catch(() => ({}))) as { prompt?: string };
-  if (!prompt) {
-    return NextResponse.json({ error: "prompt required" }, { status: 400 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!llmConfigured()) {
+    return NextResponse.json({ error: "LLM not configured" }, { status: 503 });
+  }
+  if (!rateLimit(`llm:${user.id}`, 8, 60_000)) {
+    return NextResponse.json({ error: "rate limited" }, { status: 429 });
   }
 
-  const message = await anthropic.messages.create({
-    model: DEFAULT_MODEL,
-    max_tokens: 512,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const body = (await req.json().catch(() => ({}))) as { prompt?: string; sessionId?: string };
+  if (!body.prompt) return NextResponse.json({ error: "prompt required" }, { status: 400 });
 
-  const text = message.content
-    .map((block) => (block.type === "text" ? block.text : ""))
-    .join("");
-
-  return NextResponse.json({ text });
+  try {
+    const text = await assist({ prompt: body.prompt, sessionId: body.sessionId });
+    return NextResponse.json({ text });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "assist failed" },
+      { status: 500 },
+    );
+  }
 }
