@@ -1,0 +1,142 @@
+// ORPG data model.
+// Run `npm run db:generate` after editing, and `npm run db:migrate` to apply.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Users ────────────────────────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  characters   Character[]
+  gmSessions   GameSession[] @relation("GameMaster")
+  memberships  SessionMember[]
+  messages     ChatMessage[]
+  diceRolls    DiceRoll[]
+}
+
+// ── Characters & sheets ──────────────────────────────
+model Character {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // The sheet system (stats, skills, inventory...) is rule-system dependent,
+  // so it is stored as flexible JSON for now. Tighten per-system later.
+  sheet Json @default("{}")
+
+  messages   ChatMessage[]
+  diceRolls  DiceRoll[]
+  sessions   SessionMember[]
+}
+
+// ── Sessions (a game table) ──────────────────────────
+enum SessionStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+model GameSession {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  status      SessionStatus @default(DRAFT)
+  gmId        String
+  gm          User          @relation("GameMaster", fields: [gmId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  members     SessionMember[]
+  storyboards Storyboard[]
+  messages    ChatMessage[]
+  diceRolls   DiceRoll[]
+}
+
+enum SessionRole {
+  GM
+  PLAYER
+  SPECTATOR
+}
+
+model SessionMember {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characterId String?
+  character   Character?  @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  role        SessionRole @default(PLAYER)
+  joinedAt    DateTime    @default(now())
+
+  @@unique([sessionId, userId])
+}
+
+// ── Storyboards (GM-authored, published per session) ─
+model Storyboard {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  title       String
+  body        String      @db.Text
+  order       Int         @default(0)
+  published   Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// ── Chat & dice (the live table log) ─────────────────
+enum MessageKind {
+  CHAT
+  SYSTEM
+  DICE
+  GM_NARRATION
+  LLM_ASSIST
+}
+
+model ChatMessage {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  authorId    String?
+  author      User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  characterId String?
+  character   Character?  @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  kind        MessageKind @default(CHAT)
+  content     String      @db.Text
+  createdAt   DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model DiceRoll {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  characterId String?
+  character   Character?  @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  notation    String // e.g. "2d6+3"
+  results     Json // per-die results
+  total       Int
+  createdAt   DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
+}
