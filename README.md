@@ -8,6 +8,11 @@ sheets ahead of time. Game Masters author storyboards and publish them to a
 session. An LLM helps with small things at the table: rules questions, dice
 math, and light NPC banter.
 
+**Self-hosted model.** One person runs the **host** program; it starts the web
+server, the realtime layer, and an embedded SQLite database in a single
+process. Everyone else is a **client** — they just open a browser at the host's
+address. No separate database server to install or run.
+
 > Status: **scaffolding**. Structure, config, and skeletons are in place; most
 > logic is stubbed with `TODO`. See [docs/roadmap.md](docs/roadmap.md).
 
@@ -23,35 +28,48 @@ math, and light NPC banter.
 
 - [Next.js](https://nextjs.org/) (App Router) + TypeScript + Tailwind CSS
 - [Socket.IO](https://socket.io/) over a thin custom Node server
-- [Prisma](https://www.prisma.io/) + PostgreSQL
+- [Prisma](https://www.prisma.io/) + **SQLite** (embedded — no DB server)
 - [Anthropic SDK](https://docs.anthropic.com/) for LLM assist
 
-## Getting started
+## Host & client
+
+- **Host** (the GM, or whoever runs the table): runs the host program. On
+  startup it applies database migrations (creating `data/orpg.db` if missing),
+  then serves the app and prints both a `Local` and a `Network` URL.
+- **Client** (players): open a browser at the host's **Network** URL — e.g.
+  `http://192.168.x.x:3000`. Nothing to install.
+
+## Running the host
 
 ```bash
 # 1. Install dependencies
 npm install
 
 # 2. Configure environment
-cp .env.example .env          # then fill in DATABASE_URL, ANTHROPIC_API_KEY, ...
+cp .env.example .env          # ANTHROPIC_API_KEY, NEXTAUTH_SECRET, ...
+                              # DATABASE_URL already points at the embedded SQLite file
 
-# 3. Set up the database
-npm run db:generate
-npm run db:migrate
+# 3. Build, then run the host (migrations + server start automatically)
+npm run build
+npm run host                  # prints Local + Network URLs; DB is created on first run
+```
 
-# 4. Run the dev server (Next + Socket.IO on one port)
-npm run dev                   # http://localhost:3000
+For development with hot reload (also migrates on start):
+
+```bash
+npm run dev
 ```
 
 ## Project layout
 
 ```
-server/      Custom HTTP server (Next handler + Socket.IO realtime handlers)
+server/      Host program: Next handler + Socket.IO realtime handlers
 src/app/     Pages and /api route handlers
 src/components/  UI: chat, dice, character-sheet, storyboard
 src/lib/     prisma client, anthropic client, dice roller, socket client
 src/types/   Shared Socket.IO event contract
-prisma/      Data model
+prisma/      Data model + migrations
+data/        Embedded SQLite database lives here at runtime (gitignored)
 docs/        Architecture & roadmap
 ```
 

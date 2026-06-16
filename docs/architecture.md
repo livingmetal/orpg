@@ -1,7 +1,20 @@
 # Architecture
 
-ORPG is a single Next.js app served by a thin custom Node server so that
-Socket.IO can share the same HTTP port as the Next request handler.
+ORPG is **self-hosted**: one machine runs the **host** program and everyone
+else connects as a **client** from a browser.
+
+- **Host** = a single Node process that runs the Next.js request handler,
+  Socket.IO, and an embedded **SQLite** database. On startup it applies Prisma
+  migrations (creating `data/orpg.db` if missing) and binds to `0.0.0.0` so
+  players on the LAN can reach it. See `server/index.ts` and the `host` script.
+- **Client** = a browser pointed at the host's `Network` URL. There is no
+  separate client build; the host serves the UI.
+
+Because SQLite is embedded (a file, not a server), "running the host runs the
+database" is automatic — no Postgres/MySQL process to install or start.
+
+The host is a thin custom Node server so that Socket.IO can share the same HTTP
+port as the Next request handler.
 
 ## Layers
 
@@ -18,7 +31,8 @@ src/
   lib/                  db (prisma), anthropic, dice roller, socket client
   types/                Shared contracts (Socket.IO events)
 
-prisma/                 Data model (Postgres)
+prisma/                 Data model + migrations (SQLite)
+data/                   Embedded SQLite database at runtime (gitignored)
 docs/                   This documentation
 ```
 
@@ -42,5 +56,7 @@ dice math, NPC banter. Keep prompts cheap and session-scoped.
 - `GameSession` has a `gm` (User), `members`, `storyboards`, `messages`, `diceRolls`.
 - `Storyboard` is GM-authored with a `published` flag — drafts are GM-only.
 - `Character.sheet` is JSON because sheet shape is rule-system dependent.
+- Enums are stored as `String` (SQLite has no native enums); allowed values are
+  documented in the schema and enforced in app code (see `src/types`).
 
 See [roadmap.md](roadmap.md) for the build order.

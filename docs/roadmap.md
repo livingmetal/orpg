@@ -5,12 +5,13 @@ place; most logic is stubbed with `TODO`. Suggested build order:
 
 ## 0. Setup (done)
 - [x] Project scaffold (Next.js + Socket.IO + Prisma + Anthropic)
+- [x] Host/client model: `npm run host` migrates + serves, prints LAN URL
+- [x] Embedded SQLite + initial migration (`prisma/migrations`)
 - [x] Data model (`prisma/schema.prisma`)
 - [x] Realtime contract (`src/types/socket.ts`)
 - [x] Dice roller core (`src/lib/dice.ts`)
 
 ## 1. Foundation
-- [ ] Provision Postgres, run first migration (`npm run db:migrate`)
 - [ ] Auth with NextAuth (sign in, session)
 - [ ] User profile
 

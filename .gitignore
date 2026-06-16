@@ -16,10 +16,13 @@ next-env.d.ts
 .env.local
 .env*.local
 
-# database
+# database (SQLite — keep the data/ dir, ignore the db files in it)
 *.db
 *.db-journal
-/prisma/migrations/dev.db*
+*.db-wal
+*.db-shm
+/data/*
+!/data/.gitkeep
 
 # logs
 npm-debug.log*

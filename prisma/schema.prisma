@@ -1,12 +1,16 @@
-// ORPG data model.
-// Run `npm run db:generate` after editing, and `npm run db:migrate` to apply.
+// ORPG data model (SQLite — embedded, no separate DB server).
+// The host program applies migrations on startup, so running the host
+// brings the database up automatically.
+//
+// Run `npm run db:generate` after editing the schema, and
+// `npm run db:migrate` to create/apply a migration during development.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -19,11 +23,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  characters   Character[]
-  gmSessions   GameSession[] @relation("GameMaster")
-  memberships  SessionMember[]
-  messages     ChatMessage[]
-  diceRolls    DiceRoll[]
+  characters  Character[]
+  gmSessions  GameSession[]   @relation("GameMaster")
+  memberships SessionMember[]
+  messages    ChatMessage[]
+  diceRolls   DiceRoll[]
 }
 
 // ── Characters & sheets ──────────────────────────────
@@ -37,41 +41,30 @@ model Character {
 
   // The sheet system (stats, skills, inventory...) is rule-system dependent,
   // so it is stored as flexible JSON for now. Tighten per-system later.
-  sheet Json @default("{}")
+  // (SQLite has no DB-level default for Json; callers pass `{}` on create.)
+  sheet Json
 
-  messages   ChatMessage[]
-  diceRolls  DiceRoll[]
-  sessions   SessionMember[]
+  messages  ChatMessage[]
+  diceRolls DiceRoll[]
+  sessions  SessionMember[]
 }
 
 // ── Sessions (a game table) ──────────────────────────
-enum SessionStatus {
-  DRAFT
-  OPEN
-  IN_PROGRESS
-  CLOSED
-}
-
 model GameSession {
-  id          String        @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
   description String?
-  status      SessionStatus @default(DRAFT)
+  // SessionStatus: DRAFT | OPEN | IN_PROGRESS | CLOSED (SQLite has no enums)
+  status      String   @default("DRAFT")
   gmId        String
-  gm          User          @relation("GameMaster", fields: [gmId], references: [id], onDelete: Cascade)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  gm          User     @relation("GameMaster", fields: [gmId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   members     SessionMember[]
   storyboards Storyboard[]
   messages    ChatMessage[]
   diceRolls   DiceRoll[]
-}
-
-enum SessionRole {
-  GM
-  PLAYER
-  SPECTATOR
 }
 
 model SessionMember {
@@ -82,7 +75,8 @@ model SessionMember {
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   characterId String?
   character   Character?  @relation(fields: [characterId], references: [id], onDelete: SetNull)
-  role        SessionRole @default(PLAYER)
+  // SessionRole: GM | PLAYER | SPECTATOR
+  role        String      @default("PLAYER")
   joinedAt    DateTime    @default(now())
 
   @@unique([sessionId, userId])
@@ -90,26 +84,18 @@ model SessionMember {
 
 // ── Storyboards (GM-authored, published per session) ─
 model Storyboard {
-  id          String      @id @default(cuid())
-  sessionId   String
-  session     GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  title       String
-  body        String      @db.Text
-  order       Int         @default(0)
-  published   Boolean     @default(false)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id        String      @id @default(cuid())
+  sessionId String
+  session   GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  order     Int         @default(0)
+  published Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
 // ── Chat & dice (the live table log) ─────────────────
-enum MessageKind {
-  CHAT
-  SYSTEM
-  DICE
-  GM_NARRATION
-  LLM_ASSIST
-}
-
 model ChatMessage {
   id          String      @id @default(cuid())
   sessionId   String
@@ -118,8 +104,9 @@ model ChatMessage {
   author      User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
   characterId String?
   character   Character?  @relation(fields: [characterId], references: [id], onDelete: SetNull)
-  kind        MessageKind @default(CHAT)
-  content     String      @db.Text
+  // MessageKind: CHAT | SYSTEM | DICE | GM_NARRATION | LLM_ASSIST
+  kind        String      @default("CHAT")
+  content     String
   createdAt   DateTime    @default(now())
 
   @@index([sessionId, createdAt])

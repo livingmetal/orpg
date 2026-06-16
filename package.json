@@ -4,13 +4,15 @@
   "private": true,
   "description": "Online Role-Playing Game platform — realtime chat, dice, character sheets, GM storyboards, and LLM assist.",
   "scripts": {
-    "dev": "tsx watch server/index.ts",
+    "dev": "prisma migrate deploy && tsx watch server/index.ts",
+    "host": "prisma migrate deploy && cross-env NODE_ENV=production tsx server/index.ts",
     "build": "next build",
-    "start": "cross-env NODE_ENV=production tsx server/index.ts",
+    "start": "npm run host",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio"
   },
   "dependencies": {
