@@ -41,6 +41,18 @@ address. No separate database server to install or run.
 
 ## Running the host
 
+### One-click (Windows)
+
+Double-click **`ORPG-Host.exe`** in the project root. It opens a console,
+installs deps and builds on first run if needed, then starts the host and keeps
+the window open. Close the window to stop. (`ORPG-Host.exe` is a tiny ~4.5 KB
+launcher for `host.cmd` — you can also just double-click `host.cmd` directly.)
+
+To rebuild the launcher from source: `scripts\build-launcher.cmd`
+(uses the C# compiler bundled with the .NET Framework — no extra tooling).
+
+### From a terminal
+
 ```bash
 # 1. Install dependencies
 npm install
