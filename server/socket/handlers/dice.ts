@@ -1,24 +1,66 @@
-import type { Server, Socket } from "socket.io";
-import type { ClientToServerEvents, ServerToClientEvents } from "../../../src/types/socket";
+import { prisma } from "../../../src/lib/db";
 import { roll } from "../../../src/lib/dice";
-
-type IO = Server<ClientToServerEvents, ServerToClientEvents>;
-type IOSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+import type { IO, IOSocket } from "../types";
 
 export function registerDiceHandlers(io: IO, socket: IOSocket) {
   socket.on("dice:roll", async ({ sessionId, notation }) => {
+    if (!socket.rooms.has(sessionId)) {
+      return socket.emit("error", "Join the session before rolling");
+    }
+
+    let result: ReturnType<typeof roll>;
     try {
-      const result = roll(notation);
-      // TODO: persist via prisma (DiceRoll) and attach the roller's identity.
-      io.to(sessionId).emit("dice:result", {
-        id: crypto.randomUUID(),
-        sessionId,
-        byName: null,
-        result,
-        createdAt: new Date().toISOString(),
-      });
+      result = roll(notation);
     } catch (err) {
-      socket.emit("error", err instanceof Error ? err.message : "Invalid roll");
+      return socket.emit("error", err instanceof Error ? err.message : "Invalid roll");
+    }
+
+    try {
+      const breakdown = result.rolls.map((r) => r.value).join(", ");
+      const mod = result.modifier ? (result.modifier > 0 ? ` +${result.modifier}` : ` ${result.modifier}`) : "";
+      const logLine = `🎲 ${result.notation} → ${result.total}  [${breakdown}${mod}]`;
+
+      // Persist the roll and a matching chat-log line in one transaction so the
+      // roll shows up in session history alongside chat.
+      const [diceRow, message] = await prisma.$transaction([
+        prisma.diceRoll.create({
+          data: {
+            sessionId,
+            userId: socket.data.userId,
+            notation: result.notation,
+            results: result.rolls,
+            total: result.total,
+          },
+        }),
+        prisma.chatMessage.create({
+          data: {
+            sessionId,
+            authorId: socket.data.userId,
+            kind: "DICE",
+            content: logLine,
+          },
+        }),
+      ]);
+
+      io.to(sessionId).emit("dice:result", {
+        id: diceRow.id,
+        sessionId,
+        byName: socket.data.userName,
+        result,
+        createdAt: diceRow.createdAt.toISOString(),
+      });
+
+      io.to(sessionId).emit("chat:message", {
+        id: message.id,
+        sessionId,
+        authorName: socket.data.userName,
+        characterName: null,
+        kind: "DICE",
+        content: message.content,
+        createdAt: message.createdAt.toISOString(),
+      });
+    } catch {
+      socket.emit("error", "Failed to record roll");
     }
   });
 }

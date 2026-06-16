@@ -16,12 +16,14 @@ datasource db {
 
 // ── Users ────────────────────────────────────────────
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  image     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  image        String?
+  // scrypt hash ("salt:hash"); set on first credentials sign-in.
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   characters  Character[]
   gmSessions  GameSession[]   @relation("GameMaster")

@@ -1,9 +1,14 @@
+import "./env"; // must be first: loads .env before db/auth modules evaluate
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import next from "next";
 import { Server as SocketServer } from "socket.io";
 import { registerSocketHandlers } from "./socket";
-import type { ClientToServerEvents, ServerToClientEvents } from "../src/types/socket";
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+  SocketData,
+} from "../src/types/socket";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
@@ -26,7 +31,12 @@ async function main() {
 
   const httpServer = createServer((req, res) => handle(req, res));
 
-  const io = new SocketServer<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+  const io = new SocketServer<
+    ClientToServerEvents,
+    ServerToClientEvents,
+    Record<string, never>,
+    SocketData
+  >(httpServer, {
     path: "/socket.io",
   });
 

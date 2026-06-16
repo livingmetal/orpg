@@ -87,6 +87,15 @@ docs/        Architecture & roadmap
 
 See [docs/architecture.md](docs/architecture.md) for details.
 
+## Accounts
+
+Sign in with an email + password (NextAuth credentials). The first time an email
+signs in, an account is created automatically — handy for a quick LAN table. Set
+a real `NEXTAUTH_SECRET` in `.env` before hosting (auth won't work without it).
+
+An end-to-end smoke test of auth + chat/dice persistence lives at
+`scripts/smoke.mjs` — run `node scripts/smoke.mjs` against a running host.
+
 ## License
 
 [MIT](LICENSE)

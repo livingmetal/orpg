@@ -87,6 +87,16 @@ docs/        아키텍처 & 로드맵
 
 자세한 내용은 [docs/architecture.md](docs/architecture.md) 참고.
 
+## 계정
+
+이메일 + 비밀번호로 로그인합니다(NextAuth credentials). 해당 이메일로 처음
+로그인하면 계정이 자동 생성됩니다 — LAN 테이블을 빠르게 열 때 편합니다.
+호스팅 전에 `.env` 의 `NEXTAUTH_SECRET` 을 실제 값으로 설정하세요(없으면 인증
+동작 안 함).
+
+인증 + 채팅/주사위 영속화의 end-to-end 스모크 테스트는 `scripts/smoke.mjs` 에
+있습니다 — 호스트 실행 중에 `node scripts/smoke.mjs` 로 돌립니다.
+
 ## 라이선스
 
 [MIT](LICENSE)

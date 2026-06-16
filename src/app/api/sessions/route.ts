@@ -1,14 +1,55 @@
 import { NextResponse } from "next/server";
-// import { prisma } from "@/lib/db";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
 
-// GET  /api/sessions  → list sessions
-// POST /api/sessions  → create a session (GM only)
+// GET /api/sessions → list OPEN/IN_PROGRESS sessions plus any the caller runs.
 export async function GET() {
-  // TODO: return prisma.gameSession.findMany({ where: { status: "OPEN" } })
-  return NextResponse.json({ sessions: [] });
+  const user = await getCurrentUser();
+
+  const sessions = await prisma.gameSession.findMany({
+    where: user
+      ? { OR: [{ status: { in: ["OPEN", "IN_PROGRESS"] } }, { gmId: user.id }] }
+      : { status: { in: ["OPEN", "IN_PROGRESS"] } },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      gm: { select: { id: true, name: true } },
+      _count: { select: { members: true } },
+    },
+  });
+
+  return NextResponse.json({ sessions });
 }
 
-export async function POST() {
-  // TODO: auth check, validate body with zod, create GameSession + GM membership.
-  return NextResponse.json({ error: "not implemented" }, { status: 501 });
+const CreateSession = z.object({
+  title: z.string().min(1).max(120),
+  description: z.string().max(2000).optional(),
+});
+
+// POST /api/sessions → create a session; the caller becomes the GM + a member.
+export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const parsed = CreateSession.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  }
+
+  const session = await prisma.gameSession.create({
+    data: {
+      title: parsed.data.title,
+      description: parsed.data.description,
+      status: "OPEN",
+      gmId: user.id,
+      members: { create: { userId: user.id, role: "GM" } },
+    },
+    select: { id: true, title: true, status: true },
+  });
+
+  return NextResponse.json({ session }, { status: 201 });
 }

@@ -35,3 +35,9 @@ export interface ServerToClientEvents {
   "dice:result": (payload: DiceRollPayload) => void;
   "error": (message: string) => void;
 }
+
+// Per-connection state attached after the auth handshake.
+export interface SocketData {
+  userId: string;
+  userName: string | null;
+}

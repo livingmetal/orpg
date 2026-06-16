@@ -1,22 +1,36 @@
-import type { Server, Socket } from "socket.io";
-import type { ClientToServerEvents, ServerToClientEvents } from "../../../src/types/socket";
-
-type IO = Server<ClientToServerEvents, ServerToClientEvents>;
-type IOSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+import { prisma } from "../../../src/lib/db";
+import type { IO, IOSocket } from "../types";
 
 export function registerChatHandlers(io: IO, socket: IOSocket) {
   socket.on("chat:send", async ({ sessionId, content }) => {
-    // TODO: authenticate the socket, resolve author/character, persist via
-    // prisma (ChatMessage), then broadcast the saved row.
-    // For now this just echoes to the room so the realtime path is testable.
-    io.to(sessionId).emit("chat:message", {
-      id: crypto.randomUUID(),
-      sessionId,
-      authorName: null,
-      characterName: null,
-      kind: "CHAT",
-      content,
-      createdAt: new Date().toISOString(),
-    });
+    const text = content?.trim();
+    if (!text) return;
+    if (!socket.rooms.has(sessionId)) {
+      return socket.emit("error", "Join the session before sending messages");
+    }
+
+    try {
+      const message = await prisma.chatMessage.create({
+        data: {
+          sessionId,
+          authorId: socket.data.userId,
+          kind: "CHAT",
+          content: text.slice(0, 4000),
+        },
+        include: { character: { select: { name: true } } },
+      });
+
+      io.to(sessionId).emit("chat:message", {
+        id: message.id,
+        sessionId,
+        authorName: socket.data.userName,
+        characterName: message.character?.name ?? null,
+        kind: "CHAT",
+        content: message.content,
+        createdAt: message.createdAt.toISOString(),
+      });
+    } catch {
+      socket.emit("error", "Failed to send message");
+    }
   });
 }
